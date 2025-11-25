@@ -8,6 +8,7 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc }) => {
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
     const [showPreview, setShowPreview] = useState(false);
     const [previewUrl, setPreviewUrl] = useState('');
+    const [blendMode, setBlendMode] = useState('multiply'); // 'multiply' for white bg, 'screen' for black bg
 
     // Store image objects to avoid reloading them on every render
     const bgImgRef = useRef(null);
@@ -56,8 +57,8 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc }) => {
             // Save context for composite operation
             ctx.save();
 
-            // Apply multiply blend mode for transparency
-            ctx.globalCompositeOperation = 'multiply';
+            // Apply blend mode for transparency (multiply for white bg, screen for black bg)
+            ctx.globalCompositeOperation = blendMode;
 
             const fgWidth = fgImg.width * fgScale;
             const fgHeight = fgImg.height * fgScale;
@@ -66,7 +67,7 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc }) => {
 
             ctx.restore();
         }
-    }, [imagesLoaded, fgPosition, fgScale]);
+    }, [imagesLoaded, fgPosition, fgScale, blendMode]);
 
     const handleMouseDown = (e) => {
         if (!imagesLoaded.fg || !fgImgRef.current) return;
@@ -230,6 +231,21 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc }) => {
                         onChange={(e) => setFgScale(parseFloat(e.target.value))}
                     />
                 </label>
+                <button
+                    onClick={() => setBlendMode(blendMode === 'multiply' ? 'screen' : 'multiply')}
+                    className="btn-blend-mode"
+                    style={{
+                        padding: '8px 16px',
+                        backgroundColor: blendMode === 'multiply' ? '#4CAF50' : '#2196F3',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '14px'
+                    }}
+                >
+                    {blendMode === 'multiply' ? '흰색배경' : '검은배경'}
+                </button>
                 <button onClick={handleDownload} className="btn-download">Download / Save</button>
             </div>
             <div className="canvas-container">
