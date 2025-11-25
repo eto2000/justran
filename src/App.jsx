@@ -6,6 +6,16 @@ import './styles/index.css';
 function App() {
   const [backgroundSrc, setBackgroundSrc] = useState(null);
   const [foregroundSrc, setForegroundSrc] = useState(null);
+  const [isVideo, setIsVideo] = useState(false);
+
+  const handleBackgroundUpload = (url, file) => {
+    setBackgroundSrc(url);
+    if (file && file.type.startsWith('video/')) {
+      setIsVideo(true);
+    } else {
+      setIsVideo(false);
+    }
+  };
 
   return (
     <div className="app-container">
@@ -20,7 +30,8 @@ function App() {
         <ImageUploader
           label="배경"
           id="bg-upload"
-          onUpload={setBackgroundSrc}
+          accept="image/*,video/*"
+          onUpload={handleBackgroundUpload}
         />
         <ImageUploader
           label="기록"
@@ -34,6 +45,7 @@ function App() {
           <CanvasEditor
             backgroundSrc={backgroundSrc}
             foregroundSrc={foregroundSrc}
+            isVideo={isVideo}
           />
         ) : (
           <div className="placeholder">

@@ -1,7 +1,8 @@
 import React, { useRef, useEffect, useState } from 'react';
 
-const CanvasEditor = ({ backgroundSrc, foregroundSrc }) => {
+const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
     const canvasRef = useRef(null);
+    const videoRef = useRef(null);
     const [fgPosition, setFgPosition] = useState({ x: 50, y: 50 });
     const [fgScale, setFgScale] = useState(1);
     const [isDragging, setIsDragging] = useState(false);
@@ -20,102 +21,126 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc }) => {
     const [imagesLoaded, setImagesLoaded] = useState({ bg: false, fg: false });
 
     // Load images when sources change
+    // Load images or video when sources change
     useEffect(() => {
-        const bgImg = new Image();
-        const fgImg = new Image();
+        // Reset loaded state when sources change
+        setImagesLoaded({ bg: false, fg: false });
 
-        bgImg.onload = () => {
-            bgImgRef.current = bgImg;
-            setImagesLoaded(prev => ({ ...prev, bg: true }));
-        };
+        if (isVideo && backgroundSrc) {
+            const video = document.createElement('video');
+            video.src = backgroundSrc;
+            video.crossOrigin = "anonymous";
+            video.loop = true;
+            video.muted = true;
+            video.playsInline = true;
 
-        fgImg.onload = () => {
-            fgImgRef.current = fgImg;
-            setImagesLoaded(prev => ({ ...prev, fg: true }));
-        };
+            video.onloadedmetadata = () => {
+                videoRef.current = video;
+                setImagesLoaded(prev => ({ ...prev, bg: true }));
+                video.play().catch(e => console.error("Video play failed", e));
+            };
+        } else if (backgroundSrc) {
+            const bgImg = new Image();
+            bgImg.onload = () => {
+                bgImgRef.current = bgImg;
+                setImagesLoaded(prev => ({ ...prev, bg: true }));
+            };
+            bgImg.src = backgroundSrc;
+        }
 
-        if (backgroundSrc) bgImg.src = backgroundSrc;
-        if (foregroundSrc) fgImg.src = foregroundSrc;
+        if (foregroundSrc) {
+            const fgImg = new Image();
+            fgImg.onload = () => {
+                fgImgRef.current = fgImg;
+                setImagesLoaded(prev => ({ ...prev, fg: true }));
+            };
+            fgImg.src = foregroundSrc;
+        }
 
-    }, [backgroundSrc, foregroundSrc]);
+    }, [backgroundSrc, foregroundSrc, isVideo]);
 
+    // Draw canvas whenever images are loaded or position/scale changes
     // Draw canvas whenever images are loaded or position/scale changes
     useEffect(() => {
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
 
-        if (!imagesLoaded.bg || !bgImgRef.current) return;
+        if (!imagesLoaded.bg) return;
 
-        const bgImg = bgImgRef.current;
+        let animationFrameId;
 
-        // Set canvas size to background image size
-        canvas.width = bgImg.width;
-        canvas.height = bgImg.height;
+        const drawForeground = () => {
+            if (imagesLoaded.fg && fgImgRef.current) {
+                const fgImg = fgImgRef.current;
 
-        // Draw background
-        ctx.drawImage(bgImg, 0, 0);
+                // Save context for composite operation
+                ctx.save();
 
-        if (imagesLoaded.fg && fgImgRef.current) {
-            const fgImg = fgImgRef.current;
-
-            // Save context for composite operation
-            ctx.save();
-
-            // Apply blend mode for transparency
-            // When colors are inverted, reverse the blend mode
-            // multiply <-> screen
-            let effectiveBlendMode = blendMode;
-            if (invertColors) {
-                effectiveBlendMode = blendMode === 'multiply' ? 'screen' : 'multiply';
-            }
-            ctx.globalCompositeOperation = effectiveBlendMode;
-
-            const fgWidth = fgImg.width * fgScale;
-            const fgHeight = fgImg.height * fgScale;
-
-            // If color inversion is enabled, process the image to invert only text colors
-            if (invertColors) {
-                // Create a temporary canvas to process the image
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = fgImg.width;
-                tempCanvas.height = fgImg.height;
-                const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true, alpha: true });
-
-                // Clear canvas to ensure it's transparent
-                tempCtx.clearRect(0, 0, fgImg.width, fgImg.height);
-
-                // Draw the original image
-                tempCtx.drawImage(fgImg, 0, 0);
-
-                // Get image data
-                const imageData = tempCtx.getImageData(0, 0, fgImg.width, fgImg.height);
-                const data = imageData.data;
-
-                // Invert RGB values while preserving alpha, but only for non-transparent pixels
-                for (let i = 0; i < data.length; i += 4) {
-                    const alpha = data[i + 3];
-                    // Only invert if pixel is not fully transparent
-                    if (alpha > 0) {
-                        data[i] = 255 - data[i];         // Red
-                        data[i + 1] = 255 - data[i + 1]; // Green
-                        data[i + 2] = 255 - data[i + 2]; // Blue
-                        // data[i + 3] is alpha, leave it unchanged
-                    }
+                // Apply blend mode for transparency
+                let effectiveBlendMode = blendMode;
+                if (invertColors) {
+                    effectiveBlendMode = blendMode === 'multiply' ? 'screen' : 'multiply';
                 }
+                ctx.globalCompositeOperation = effectiveBlendMode;
 
-                // Put the modified image data back
-                tempCtx.putImageData(imageData, 0, 0);
+                const fgWidth = fgImg.width * fgScale;
+                const fgHeight = fgImg.height * fgScale;
 
-                // Draw the inverted image
-                ctx.drawImage(tempCanvas, fgPosition.x, fgPosition.y, fgWidth, fgHeight);
-            } else {
-                // Draw the original image without inversion
-                ctx.drawImage(fgImg, fgPosition.x, fgPosition.y, fgWidth, fgHeight);
+                if (invertColors) {
+                    const tempCanvas = document.createElement('canvas');
+                    tempCanvas.width = fgImg.width;
+                    tempCanvas.height = fgImg.height;
+                    const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true, alpha: true });
+                    tempCtx.clearRect(0, 0, fgImg.width, fgImg.height);
+                    tempCtx.drawImage(fgImg, 0, 0);
+                    const imageData = tempCtx.getImageData(0, 0, fgImg.width, fgImg.height);
+                    const data = imageData.data;
+                    for (let i = 0; i < data.length; i += 4) {
+                        const alpha = data[i + 3];
+                        if (alpha > 0) {
+                            data[i] = 255 - data[i];
+                            data[i + 1] = 255 - data[i + 1];
+                            data[i + 2] = 255 - data[i + 2];
+                        }
+                    }
+                    tempCtx.putImageData(imageData, 0, 0);
+                    ctx.drawImage(tempCanvas, fgPosition.x, fgPosition.y, fgWidth, fgHeight);
+                } else {
+                    ctx.drawImage(fgImg, fgPosition.x, fgPosition.y, fgWidth, fgHeight);
+                }
+                ctx.restore();
             }
+        };
 
-            ctx.restore();
-        }
-    }, [imagesLoaded, fgPosition, fgScale, blendMode, invertColors]);
+        const render = () => {
+            if (isVideo && videoRef.current) {
+                const video = videoRef.current;
+                if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                }
+                ctx.drawImage(video, 0, 0);
+                drawForeground();
+                animationFrameId = requestAnimationFrame(render);
+            } else if (!isVideo && bgImgRef.current) {
+                const bgImg = bgImgRef.current;
+                if (canvas.width !== bgImg.width || canvas.height !== bgImg.height) {
+                    canvas.width = bgImg.width;
+                    canvas.height = bgImg.height;
+                }
+                ctx.drawImage(bgImg, 0, 0);
+                drawForeground();
+            }
+        };
+
+        render();
+
+        return () => {
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+            }
+        };
+    }, [imagesLoaded, fgPosition, fgScale, blendMode, invertColors, isVideo]);
 
     const handleMouseDown = (e) => {
         if (!imagesLoaded.fg || !fgImgRef.current) return;
@@ -267,8 +292,87 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc }) => {
     };
 
     const handleDownload = async () => {
+        console.log("handleDownload called");
         const canvas = canvasRef.current;
 
+        if (isVideo && videoRef.current) {
+            console.log("Downloading video...");
+            const video = videoRef.current;
+
+            // Start recording process
+            try {
+                const stream = canvas.captureStream(30); // 30 FPS
+                console.log("Stream captured:", stream);
+
+                let mimeType = 'video/webm'; // Default fallback
+                if (MediaRecorder.isTypeSupported('video/mp4')) {
+                    mimeType = 'video/mp4';
+                } else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) {
+                    mimeType = 'video/webm;codecs=vp9';
+                } else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8')) {
+                    mimeType = 'video/webm;codecs=vp8';
+                }
+
+                console.log("Using MIME type:", mimeType);
+
+                if (!MediaRecorder.isTypeSupported(mimeType)) {
+                    alert("이 브라우저에서는 비디오 저장을 지원하지 않습니다.");
+                    return;
+                }
+
+                const mediaRecorder = new MediaRecorder(stream, { mimeType });
+                console.log("MediaRecorder created:", mediaRecorder);
+
+                const chunks = [];
+
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) {
+                        chunks.push(e.data);
+                    }
+                };
+
+                mediaRecorder.onstop = () => {
+                    console.log("Recording stopped, creating blob...");
+                    const blob = new Blob(chunks, { type: mimeType });
+                    const url = URL.createObjectURL(blob);
+
+                    // Download logic
+                    const link = document.createElement('a');
+                    link.href = url;
+                    // Extension based on mimeType
+                    const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+                    link.download = `composed-video.${ext}`;
+                    link.click();
+
+                    // Reset video loop
+                    video.loop = true;
+                    video.play();
+                };
+
+                // Prepare for recording
+                video.pause();
+                video.currentTime = 0;
+                video.loop = false; // Play once for recording
+
+                mediaRecorder.start();
+                console.log("Recording started");
+
+                video.onended = () => {
+                    console.log("Video ended, stopping recording");
+                    mediaRecorder.stop();
+                    video.onended = null; // Cleanup
+                };
+
+                video.play().then(() => console.log("Video playing for recording"))
+                    .catch(e => console.error("Video play failed during recording:", e));
+            } catch (e) {
+                console.error("Error in video download:", e);
+            }
+            return;
+        }
+
+        console.log("Downloading image...");
+        // Image download logic
         // Check if Web Share API is supported and we can share files
         if (navigator.share && navigator.canShare) {
             try {

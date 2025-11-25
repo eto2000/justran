@@ -1,14 +1,11 @@
 import React from 'react';
 
-const ImageUploader = ({ onUpload, label, id }) => {
+const ImageUploader = ({ onUpload, label, id, accept = "image/*" }) => {
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        onUpload(event.target.result);
-      };
-      reader.readAsDataURL(file);
+      const url = URL.createObjectURL(file);
+      onUpload(url, file);
     }
   };
 
@@ -20,7 +17,7 @@ const ImageUploader = ({ onUpload, label, id }) => {
       <input
         type="file"
         id={id}
-        accept="image/*"
+        accept={accept}
         onChange={handleFileChange}
         className="upload-input"
       />
