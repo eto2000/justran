@@ -9,6 +9,7 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc }) => {
     const [showPreview, setShowPreview] = useState(false);
     const [previewUrl, setPreviewUrl] = useState('');
     const [blendMode, setBlendMode] = useState('multiply'); // 'multiply' for white bg, 'screen' for black bg
+    const [invertColors, setInvertColors] = useState(false); // Toggle to invert text colors
 
     // Store image objects to avoid reloading them on every render
     const bgImgRef = useRef(null);
@@ -57,17 +58,58 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc }) => {
             // Save context for composite operation
             ctx.save();
 
-            // Apply blend mode for transparency (multiply for white bg, screen for black bg)
-            ctx.globalCompositeOperation = blendMode;
+            // Apply blend mode for transparency
+            // When colors are inverted (black->white), use 'screen' mode
+            // When colors are normal (white->black or black text), use 'multiply' mode
+            const effectiveBlendMode = invertColors ? 'screen' : blendMode;
+            ctx.globalCompositeOperation = effectiveBlendMode;
 
             const fgWidth = fgImg.width * fgScale;
             const fgHeight = fgImg.height * fgScale;
 
-            ctx.drawImage(fgImg, fgPosition.x, fgPosition.y, fgWidth, fgHeight);
+            // If color inversion is enabled, process the image to invert only text colors
+            if (invertColors) {
+                // Create a temporary canvas to process the image
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = fgImg.width;
+                tempCanvas.height = fgImg.height;
+                const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true, alpha: true });
+
+                // Clear canvas to ensure it's transparent
+                tempCtx.clearRect(0, 0, fgImg.width, fgImg.height);
+
+                // Draw the original image
+                tempCtx.drawImage(fgImg, 0, 0);
+
+                // Get image data
+                const imageData = tempCtx.getImageData(0, 0, fgImg.width, fgImg.height);
+                const data = imageData.data;
+
+                // Invert RGB values while preserving alpha, but only for non-transparent pixels
+                for (let i = 0; i < data.length; i += 4) {
+                    const alpha = data[i + 3];
+                    // Only invert if pixel is not fully transparent
+                    if (alpha > 0) {
+                        data[i] = 255 - data[i];         // Red
+                        data[i + 1] = 255 - data[i + 1]; // Green
+                        data[i + 2] = 255 - data[i + 2]; // Blue
+                        // data[i + 3] is alpha, leave it unchanged
+                    }
+                }
+
+                // Put the modified image data back
+                tempCtx.putImageData(imageData, 0, 0);
+
+                // Draw the inverted image
+                ctx.drawImage(tempCanvas, fgPosition.x, fgPosition.y, fgWidth, fgHeight);
+            } else {
+                // Draw the original image without inversion
+                ctx.drawImage(fgImg, fgPosition.x, fgPosition.y, fgWidth, fgHeight);
+            }
 
             ctx.restore();
         }
-    }, [imagesLoaded, fgPosition, fgScale, blendMode]);
+    }, [imagesLoaded, fgPosition, fgScale, blendMode, invertColors]);
 
     const handleMouseDown = (e) => {
         if (!imagesLoaded.fg || !fgImgRef.current) return;
@@ -245,6 +287,21 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc }) => {
                     }}
                 >
                     {blendMode === 'multiply' ? '배경전환' : '배경전환'}
+                </button>
+                <button
+                    onClick={() => setInvertColors(!invertColors)}
+                    className="btn-invert"
+                    style={{
+                        padding: '8px 16px',
+                        backgroundColor: invertColors ? '#FF5722' : '#9E9E9E',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '14px'
+                    }}
+                >
+                    색상반전
                 </button>
                 <button onClick={handleDownload} className="btn-download">저장</button>
             </div>
