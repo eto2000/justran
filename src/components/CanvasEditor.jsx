@@ -14,6 +14,7 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
     const [previewUrl, setPreviewUrl] = useState('');
     const [blendMode, setBlendMode] = useState('multiply'); // 'multiply' for white bg, 'screen' for black bg
     const [invertColors, setInvertColors] = useState(false); // Toggle to invert text colors
+    const [isDownloading, setIsDownloading] = useState(false); // Track download progress
 
     // Store image objects to avoid reloading them on every render
     const bgImgRef = useRef(null);
@@ -293,11 +294,21 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
 
     const handleDownload = async () => {
         console.log("handleDownload called");
+
+        // Prevent multiple simultaneous downloads
+        if (isDownloading) {
+            console.log("Download already in progress, ignoring...");
+            return;
+        }
+
         const canvas = canvasRef.current;
 
         if (isVideo && videoRef.current) {
             console.log("Downloading video...");
             const video = videoRef.current;
+
+            // Set downloading state
+            setIsDownloading(true);
 
             // Start recording process
             try {
@@ -347,6 +358,9 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
                     // Reset video loop
                     video.loop = true;
                     video.play();
+
+                    // Reset downloading state
+                    setIsDownloading(false);
                 };
 
                 // Prepare for recording
@@ -367,6 +381,8 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
                     .catch(e => console.error("Video play failed during recording:", e));
             } catch (e) {
                 console.error("Error in video download:", e);
+                // Reset downloading state on error
+                setIsDownloading(false);
             }
             return;
         }
@@ -439,7 +455,13 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
                     >
                         글자색
                     </button>
-                    <button onClick={handleDownload} className="btn-control btn-save">저장</button>
+                    <button
+                        onClick={handleDownload}
+                        className="btn-control btn-save"
+                        disabled={isDownloading}
+                    >
+                        {isDownloading ? '저장 중...' : '저장'}
+                    </button>
                 </div>
             </div>
             <div className="canvas-container">

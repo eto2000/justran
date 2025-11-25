@@ -188,6 +188,18 @@ h1 {
   background-color: #388E3C;
 }
 
+.btn-save:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Disabled button state for all control buttons */
+.btn-control:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 /* Legacy support */
 .btn-download {
   background-color: #4CAF50;
