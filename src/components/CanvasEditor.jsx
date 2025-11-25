@@ -6,6 +6,9 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc }) => {
     const [fgScale, setFgScale] = useState(1);
     const [isDragging, setIsDragging] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+    const [isPinching, setIsPinching] = useState(false);
+    const initialPinchDistance = useRef(0);
+    const initialPinchScale = useRef(1);
     const [showPreview, setShowPreview] = useState(false);
     const [previewUrl, setPreviewUrl] = useState('');
     const [blendMode, setBlendMode] = useState('multiply'); // 'multiply' for white bg, 'screen' for black bg
@@ -166,60 +169,101 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc }) => {
         setIsDragging(false);
     };
 
+    // Helper function to calculate distance between two touch points
+    const getTouchDistance = (touch1, touch2) => {
+        const dx = touch1.clientX - touch2.clientX;
+        const dy = touch1.clientY - touch2.clientY;
+        return Math.sqrt(dx * dx + dy * dy);
+    };
+
     // Touch event handlers for mobile support
     const handleTouchStart = (e) => {
         if (!imagesLoaded.fg || !fgImgRef.current) return;
 
-        // Prevent scrolling while dragging
-        // e.preventDefault(); // Note: might need touch-action: none in CSS
+        // Two-finger pinch to zoom
+        if (e.touches.length === 2) {
+            e.preventDefault();
+            setIsPinching(true);
+            setIsDragging(false); // Stop dragging if pinching starts
 
-        const touch = e.touches[0];
-        const canvas = canvasRef.current;
-        const rect = canvas.getBoundingClientRect();
+            const distance = getTouchDistance(e.touches[0], e.touches[1]);
+            initialPinchDistance.current = distance;
+            initialPinchScale.current = fgScale;
+            return;
+        }
 
-        const scaleX = canvas.width / rect.width;
-        const scaleY = canvas.height / rect.height;
-        const touchX = (touch.clientX - rect.left) * scaleX;
-        const touchY = (touch.clientY - rect.top) * scaleY;
+        // Single finger drag
+        if (e.touches.length === 1) {
+            const touch = e.touches[0];
+            const canvas = canvasRef.current;
+            const rect = canvas.getBoundingClientRect();
 
-        const fgImg = fgImgRef.current;
-        const fgWidth = fgImg.width * fgScale;
-        const fgHeight = fgImg.height * fgScale;
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const touchX = (touch.clientX - rect.left) * scaleX;
+            const touchY = (touch.clientY - rect.top) * scaleY;
 
-        if (
-            touchX >= fgPosition.x &&
-            touchX <= fgPosition.x + fgWidth &&
-            touchY >= fgPosition.y &&
-            touchY <= fgPosition.y + fgHeight
-        ) {
-            setIsDragging(true);
-            setDragStart({
-                x: touchX - fgPosition.x,
-                y: touchY - fgPosition.y
-            });
+            const fgImg = fgImgRef.current;
+            const fgWidth = fgImg.width * fgScale;
+            const fgHeight = fgImg.height * fgScale;
+
+            if (
+                touchX >= fgPosition.x &&
+                touchX <= fgPosition.x + fgWidth &&
+                touchY >= fgPosition.y &&
+                touchY <= fgPosition.y + fgHeight
+            ) {
+                setIsDragging(true);
+                setDragStart({
+                    x: touchX - fgPosition.x,
+                    y: touchY - fgPosition.y
+                });
+            }
         }
     };
 
     const handleTouchMove = (e) => {
-        if (!isDragging) return;
+        // Handle pinch-to-zoom
+        if (isPinching && e.touches.length === 2) {
+            e.preventDefault();
 
-        const touch = e.touches[0];
-        const canvas = canvasRef.current;
-        const rect = canvas.getBoundingClientRect();
+            const distance = getTouchDistance(e.touches[0], e.touches[1]);
+            const scale = (distance / initialPinchDistance.current) * initialPinchScale.current;
 
-        const scaleX = canvas.width / rect.width;
-        const scaleY = canvas.height / rect.height;
-        const touchX = (touch.clientX - rect.left) * scaleX;
-        const touchY = (touch.clientY - rect.top) * scaleY;
+            // Limit scale between 0.1 and 3 (same as slider)
+            const clampedScale = Math.max(0.1, Math.min(3, scale));
+            setFgScale(clampedScale);
+            return;
+        }
 
-        setFgPosition({
-            x: touchX - dragStart.x,
-            y: touchY - dragStart.y
-        });
+        // Handle single-finger drag
+        if (isDragging && e.touches.length === 1) {
+            const touch = e.touches[0];
+            const canvas = canvasRef.current;
+            const rect = canvas.getBoundingClientRect();
+
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const touchX = (touch.clientX - rect.left) * scaleX;
+            const touchY = (touch.clientY - rect.top) * scaleY;
+
+            setFgPosition({
+                x: touchX - dragStart.x,
+                y: touchY - dragStart.y
+            });
+        }
     };
 
-    const handleTouchEnd = () => {
-        setIsDragging(false);
+    const handleTouchEnd = (e) => {
+        // If no more touches, reset both states
+        if (e.touches.length === 0) {
+            setIsDragging(false);
+            setIsPinching(false);
+        }
+        // If went from 2 fingers to 1, stop pinching but might start dragging
+        else if (e.touches.length === 1 && isPinching) {
+            setIsPinching(false);
+        }
     };
 
     const handleDownload = async () => {
@@ -289,7 +333,7 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc }) => {
                         fontSize: '14px'
                     }}
                 >
-                    {blendMode === 'multiply' ? '검은글자' : '흰글자'}
+                    {blendMode === 'multiply' ? '배경' : '배경'}
                 </button>
                 <button
                     onClick={() => setInvertColors(!invertColors)}
@@ -304,7 +348,7 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc }) => {
                         fontSize: '14px'
                     }}
                 >
-                    색상반전
+                    글자색
                 </button>
                 <button onClick={handleDownload} className="btn-download">저장</button>
             </div>
