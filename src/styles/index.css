@@ -116,3 +116,29 @@ h1 {
   max-height: 80vh;
   border: 1px solid #ddd;
 }
+
+@media (max-width: 768px) {
+  .app-container {
+    padding: 5px;
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .workspace {
+    padding: 5px;
+  }
+
+  header {
+    margin-bottom: 15px;
+  }
+
+  h1 {
+    font-size: 1.8rem;
+    margin-bottom: 5px;
+  }
+
+  .upload-section {
+    gap: 10px;
+    margin-bottom: 15px;
+  }
+}
