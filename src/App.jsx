@@ -10,8 +10,8 @@ function App() {
   return (
     <div className="app-container">
       <header>
-        <h1>Image Composer</h1>
-        <p>Upload a background and a text image to compose them.</p>
+        <h1>Just Ran!</h1>
+        <p>배경이미지와 기록을 올리세요</p>
       </header>
 
       <div className="upload-section">
@@ -21,7 +21,7 @@ function App() {
           onUpload={setBackgroundSrc}
         />
         <ImageUploader
-          label="Text Image (White BG)"
+          label="기록(흰색바탕)"
           id="fg-upload"
           onUpload={setForegroundSrc}
         />
@@ -35,7 +35,7 @@ function App() {
           />
         ) : (
           <div className="placeholder">
-            <p>Please upload a background image to start.</p>
+            <p>다녀왔냐? 기록 남기자</p>
           </div>
         )}
       </main>
