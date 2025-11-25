@@ -118,6 +118,62 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc }) => {
         setIsDragging(false);
     };
 
+    // Touch event handlers for mobile support
+    const handleTouchStart = (e) => {
+        if (!imagesLoaded.fg || !fgImgRef.current) return;
+
+        // Prevent scrolling while dragging
+        // e.preventDefault(); // Note: might need touch-action: none in CSS
+
+        const touch = e.touches[0];
+        const canvas = canvasRef.current;
+        const rect = canvas.getBoundingClientRect();
+
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const touchX = (touch.clientX - rect.left) * scaleX;
+        const touchY = (touch.clientY - rect.top) * scaleY;
+
+        const fgImg = fgImgRef.current;
+        const fgWidth = fgImg.width * fgScale;
+        const fgHeight = fgImg.height * fgScale;
+
+        if (
+            touchX >= fgPosition.x &&
+            touchX <= fgPosition.x + fgWidth &&
+            touchY >= fgPosition.y &&
+            touchY <= fgPosition.y + fgHeight
+        ) {
+            setIsDragging(true);
+            setDragStart({
+                x: touchX - fgPosition.x,
+                y: touchY - fgPosition.y
+            });
+        }
+    };
+
+    const handleTouchMove = (e) => {
+        if (!isDragging) return;
+
+        const touch = e.touches[0];
+        const canvas = canvasRef.current;
+        const rect = canvas.getBoundingClientRect();
+
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const touchX = (touch.clientX - rect.left) * scaleX;
+        const touchY = (touch.clientY - rect.top) * scaleY;
+
+        setFgPosition({
+            x: touchX - dragStart.x,
+            y: touchY - dragStart.y
+        });
+    };
+
+    const handleTouchEnd = () => {
+        setIsDragging(false);
+    };
+
     const handleDownload = () => {
         const canvas = canvasRef.current;
         const link = document.createElement('a');
@@ -149,7 +205,16 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc }) => {
                     onMouseMove={handleMouseMove}
                     onMouseUp={handleMouseUp}
                     onMouseLeave={handleMouseUp}
-                    style={{ maxWidth: '100%', height: 'auto', border: '1px solid #ccc', cursor: isDragging ? 'grabbing' : 'default' }}
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                    style={{
+                        maxWidth: '100%',
+                        height: 'auto',
+                        border: '1px solid #ccc',
+                        cursor: isDragging ? 'grabbing' : 'default',
+                        touchAction: 'none' // Prevent scrolling on mobile while dragging
+                    }}
                 />
             </div>
         </div>
