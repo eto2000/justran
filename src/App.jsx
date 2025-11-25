@@ -21,7 +21,7 @@ function App() {
           onUpload={setBackgroundSrc}
         />
         <ImageUploader
-          label="기록(흰색바탕)"
+          label="기록이미지"
           id="fg-upload"
           onUpload={setForegroundSrc}
         />

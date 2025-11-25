@@ -244,9 +244,9 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc }) => {
                         fontSize: '14px'
                     }}
                 >
-                    {blendMode === 'multiply' ? '흰색배경' : '검은배경'}
+                    {blendMode === 'multiply' ? '배경전환' : '배경전환'}
                 </button>
-                <button onClick={handleDownload} className="btn-download">Download / Save</button>
+                <button onClick={handleDownload} className="btn-download">저장</button>
             </div>
             <div className="canvas-container">
                 <canvas
@@ -294,7 +294,7 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc }) => {
                         alignItems: 'center',
                         gap: '15px'
                     }}>
-                        <p style={{ margin: 0, fontWeight: 'bold' }}>길게 눌러 저장하기</p>
+                        <p style={{ margin: 0, fontWeight: 'bold' }}>저장하려면 이미지를 오래 눌러요</p>
                         <img
                             src={previewUrl}
                             alt="Preview"
