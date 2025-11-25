@@ -59,9 +59,12 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc }) => {
             ctx.save();
 
             // Apply blend mode for transparency
-            // When colors are inverted (black->white), use 'screen' mode
-            // When colors are normal (white->black or black text), use 'multiply' mode
-            const effectiveBlendMode = invertColors ? 'screen' : blendMode;
+            // When colors are inverted, reverse the blend mode
+            // multiply <-> screen
+            let effectiveBlendMode = blendMode;
+            if (invertColors) {
+                effectiveBlendMode = blendMode === 'multiply' ? 'screen' : 'multiply';
+            }
             ctx.globalCompositeOperation = effectiveBlendMode;
 
             const fgWidth = fgImg.width * fgScale;
@@ -286,7 +289,7 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc }) => {
                         fontSize: '14px'
                     }}
                 >
-                    {blendMode === 'multiply' ? '배경전환' : '배경전환'}
+                    {blendMode === 'multiply' ? '검은글자' : '흰글자'}
                 </button>
                 <button
                     onClick={() => setInvertColors(!invertColors)}
