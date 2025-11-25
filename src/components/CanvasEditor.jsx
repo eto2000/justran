@@ -6,6 +6,8 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc }) => {
     const [fgScale, setFgScale] = useState(1);
     const [isDragging, setIsDragging] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+    const [showPreview, setShowPreview] = useState(false);
+    const [previewUrl, setPreviewUrl] = useState('');
 
     // Store image objects to avoid reloading them on every render
     const bgImgRef = useRef(null);
@@ -174,12 +176,44 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc }) => {
         setIsDragging(false);
     };
 
-    const handleDownload = () => {
+    const handleDownload = async () => {
         const canvas = canvasRef.current;
-        const link = document.createElement('a');
-        link.download = 'composed-image.png';
-        link.href = canvas.toDataURL();
-        link.click();
+
+        // Check if Web Share API is supported and we can share files
+        if (navigator.share && navigator.canShare) {
+            try {
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+                const file = new File([blob], 'composed-image.png', { type: 'image/png' });
+
+                if (navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                        files: [file],
+                        title: 'Composed Image',
+                        text: 'Check out my composed image!'
+                    });
+                    return;
+                }
+            } catch (error) {
+                console.log('Sharing failed or was cancelled:', error);
+                // Fallback to preview if sharing fails
+            }
+        }
+
+        // Fallback: Show preview for long-press save on mobile, or download link on desktop
+        const url = canvas.toDataURL();
+
+        // Simple detection for mobile devices to prefer preview over download link
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+        if (isMobile) {
+            setPreviewUrl(url);
+            setShowPreview(true);
+        } else {
+            const link = document.createElement('a');
+            link.download = 'composed-image.png';
+            link.href = url;
+            link.click();
+        }
     };
 
     return (
@@ -196,7 +230,7 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc }) => {
                         onChange={(e) => setFgScale(parseFloat(e.target.value))}
                     />
                 </label>
-                <button onClick={handleDownload} className="btn-download">Download</button>
+                <button onClick={handleDownload} className="btn-download">Download / Save</button>
             </div>
             <div className="canvas-container">
                 <canvas
@@ -217,6 +251,60 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc }) => {
                     }}
                 />
             </div>
+
+            {showPreview && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0,0,0,0.8)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000,
+                    padding: '20px'
+                }}>
+                    <div style={{
+                        backgroundColor: 'white',
+                        padding: '20px',
+                        borderRadius: '10px',
+                        maxWidth: '90%',
+                        maxHeight: '90%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '15px'
+                    }}>
+                        <p style={{ margin: 0, fontWeight: 'bold' }}>길게 눌러 저장하기</p>
+                        <img
+                            src={previewUrl}
+                            alt="Preview"
+                            style={{
+                                maxWidth: '100%',
+                                maxHeight: '60vh',
+                                objectFit: 'contain',
+                                border: '1px solid #eee'
+                            }}
+                        />
+                        <button
+                            onClick={() => setShowPreview(false)}
+                            style={{
+                                padding: '10px 20px',
+                                backgroundColor: '#333',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '5px',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            Close
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

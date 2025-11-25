@@ -16,12 +16,12 @@ function App() {
 
       <div className="upload-section">
         <ImageUploader
-          label="1. Upload Background"
+          label="Background"
           id="bg-upload"
           onUpload={setBackgroundSrc}
         />
         <ImageUploader
-          label="2. Upload Text Image (White BG)"
+          label="Text Image (White BG)"
           id="fg-upload"
           onUpload={setForegroundSrc}
         />
