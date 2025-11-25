@@ -322,35 +322,17 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc }) => {
                 </label>
                 <button
                     onClick={() => setBlendMode(blendMode === 'multiply' ? 'screen' : 'multiply')}
-                    className="btn-blend-mode"
-                    style={{
-                        padding: '8px 16px',
-                        backgroundColor: blendMode === 'multiply' ? '#4CAF50' : '#2196F3',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontSize: '14px'
-                    }}
+                    className="btn-control btn-background"
                 >
-                    {blendMode === 'multiply' ? '배경' : '배경'}
+                    배경
                 </button>
                 <button
                     onClick={() => setInvertColors(!invertColors)}
-                    className="btn-invert"
-                    style={{
-                        padding: '8px 16px',
-                        backgroundColor: invertColors ? '#FF5722' : '#9E9E9E',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontSize: '14px'
-                    }}
+                    className={`btn-control btn-text-color ${invertColors ? 'active' : ''}`}
                 >
                     글자색
                 </button>
-                <button onClick={handleDownload} className="btn-download">저장</button>
+                <button onClick={handleDownload} className="btn-control btn-save">저장</button>
             </div>
             <div className="canvas-container">
                 <canvas

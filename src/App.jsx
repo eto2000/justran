@@ -16,12 +16,12 @@ function App() {
 
       <div className="upload-section">
         <ImageUploader
-          label="Background"
+          label="배경"
           id="bg-upload"
           onUpload={setBackgroundSrc}
         />
         <ImageUploader
-          label="기록이미지"
+          label="기록"
           id="fg-upload"
           onUpload={setForegroundSrc}
         />

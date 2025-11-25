@@ -88,15 +88,63 @@ h1 {
 
 .controls {
   display: flex;
-  gap: 20px;
+  gap: 10px;
   align-items: center;
   background-color: var(--secondary-color);
   padding: 10px 20px;
   border-radius: var(--border-radius);
 }
 
+/* Unified button styles */
+.btn-control {
+  color: white;
+  border: none;
+  /* padding: 10px 20px; */
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 1rem;
+  transition: background-color 0.3s;
+}
+
+/* Background button - Blue */
+.btn-background {
+  background-color: #2196F3;
+}
+
+.btn-background:hover {
+  background-color: #1976D2;
+}
+
+.btn-background.active {
+  background-color: #1565C0;
+}
+
+/* Text color button - Orange */
+.btn-text-color {
+  background-color: #FF9800;
+}
+
+.btn-text-color:hover {
+  background-color: #F57C00;
+}
+
+.btn-text-color.active {
+  background-color: #E65100;
+}
+
+/* Save button - Green */
+.btn-save {
+  background-color: #4CAF50;
+}
+
+.btn-save:hover {
+  background-color: #388E3C;
+}
+
+/* Legacy support */
 .btn-download {
-  background-color: #27ae60;
+  background-color: #4CAF50;
   color: white;
   border: none;
   padding: 10px 20px;
@@ -107,7 +155,7 @@ h1 {
 }
 
 .btn-download:hover {
-  background-color: #219150;
+  background-color: #388E3C;
 }
 
 .canvas-container {
