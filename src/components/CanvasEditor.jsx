@@ -7,81 +7,111 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc }) => {
     const [isDragging, setIsDragging] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
-    // Draw canvas
+    // Store image objects to avoid reloading them on every render
+    const bgImgRef = useRef(null);
+    const fgImgRef = useRef(null);
+    const [imagesLoaded, setImagesLoaded] = useState({ bg: false, fg: false });
+
+    // Load images when sources change
+    useEffect(() => {
+        const bgImg = new Image();
+        const fgImg = new Image();
+
+        bgImg.onload = () => {
+            bgImgRef.current = bgImg;
+            setImagesLoaded(prev => ({ ...prev, bg: true }));
+        };
+
+        fgImg.onload = () => {
+            fgImgRef.current = fgImg;
+            setImagesLoaded(prev => ({ ...prev, fg: true }));
+        };
+
+        if (backgroundSrc) bgImg.src = backgroundSrc;
+        if (foregroundSrc) fgImg.src = foregroundSrc;
+
+    }, [backgroundSrc, foregroundSrc]);
+
+    // Draw canvas whenever images are loaded or position/scale changes
     useEffect(() => {
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
 
-        const bgImg = new Image();
-        const fgImg = new Image();
+        if (!imagesLoaded.bg || !bgImgRef.current) return;
 
-        let bgLoaded = false;
-        let fgLoaded = false;
+        const bgImg = bgImgRef.current;
 
-        const draw = () => {
-            if (!bgLoaded) return;
+        // Set canvas size to background image size
+        canvas.width = bgImg.width;
+        canvas.height = bgImg.height;
 
-            // Set canvas size to background image size
-            canvas.width = bgImg.width;
-            canvas.height = bgImg.height;
+        // Draw background
+        ctx.drawImage(bgImg, 0, 0);
 
-            // Draw background
-            ctx.drawImage(bgImg, 0, 0);
+        if (imagesLoaded.fg && fgImgRef.current) {
+            const fgImg = fgImgRef.current;
 
-            if (fgLoaded) {
-                // Save context for composite operation
-                ctx.save();
+            // Save context for composite operation
+            ctx.save();
 
-                // Apply multiply blend mode for transparency
-                ctx.globalCompositeOperation = 'multiply';
+            // Apply multiply blend mode for transparency
+            ctx.globalCompositeOperation = 'multiply';
 
-                const fgWidth = fgImg.width * fgScale;
-                const fgHeight = fgImg.height * fgScale;
+            const fgWidth = fgImg.width * fgScale;
+            const fgHeight = fgImg.height * fgScale;
 
-                ctx.drawImage(fgImg, fgPosition.x, fgPosition.y, fgWidth, fgHeight);
+            ctx.drawImage(fgImg, fgPosition.x, fgPosition.y, fgWidth, fgHeight);
 
-                ctx.restore();
-            }
-        };
-
-        bgImg.onload = () => {
-            bgLoaded = true;
-            draw();
-        };
-
-        fgImg.onload = () => {
-            fgLoaded = true;
-            draw();
-        };
-
-        if (backgroundSrc) {
-            bgImg.src = backgroundSrc;
+            ctx.restore();
         }
-
-        if (foregroundSrc) {
-            fgImg.src = foregroundSrc;
-        }
-
-    }, [backgroundSrc, foregroundSrc, fgPosition, fgScale]);
+    }, [imagesLoaded, fgPosition, fgScale]);
 
     const handleMouseDown = (e) => {
-        const rect = canvasRef.current.getBoundingClientRect();
-        const x = (e.clientX - rect.left) * (canvasRef.current.width / rect.width);
-        const y = (e.clientY - rect.top) * (canvasRef.current.height / rect.height);
+        if (!imagesLoaded.fg || !fgImgRef.current) return;
 
-        // Simple hit detection (can be improved)
-        setIsDragging(true);
-        setDragStart({ x: x - fgPosition.x, y: y - fgPosition.y });
+        const canvas = canvasRef.current;
+        const rect = canvas.getBoundingClientRect();
+
+        // Calculate mouse position relative to canvas
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const mouseX = (e.clientX - rect.left) * scaleX;
+        const mouseY = (e.clientY - rect.top) * scaleY;
+
+        // Hit detection
+        const fgImg = fgImgRef.current;
+        const fgWidth = fgImg.width * fgScale;
+        const fgHeight = fgImg.height * fgScale;
+
+        if (
+            mouseX >= fgPosition.x &&
+            mouseX <= fgPosition.x + fgWidth &&
+            mouseY >= fgPosition.y &&
+            mouseY <= fgPosition.y + fgHeight
+        ) {
+            setIsDragging(true);
+            setDragStart({
+                x: mouseX - fgPosition.x,
+                y: mouseY - fgPosition.y
+            });
+        }
     };
 
     const handleMouseMove = (e) => {
         if (!isDragging) return;
 
-        const rect = canvasRef.current.getBoundingClientRect();
-        const x = (e.clientX - rect.left) * (canvasRef.current.width / rect.width);
-        const y = (e.clientY - rect.top) * (canvasRef.current.height / rect.height);
+        const canvas = canvasRef.current;
+        const rect = canvas.getBoundingClientRect();
 
-        setFgPosition({ x: x - dragStart.x, y: y - dragStart.y });
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const mouseX = (e.clientX - rect.left) * scaleX;
+        const mouseY = (e.clientY - rect.top) * scaleY;
+
+        setFgPosition({
+            x: mouseX - dragStart.x,
+            y: mouseY - dragStart.y
+        });
     };
 
     const handleMouseUp = () => {
@@ -119,7 +149,7 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc }) => {
                     onMouseMove={handleMouseMove}
                     onMouseUp={handleMouseUp}
                     onMouseLeave={handleMouseUp}
-                    style={{ maxWidth: '100%', height: 'auto', border: '1px solid #ccc' }}
+                    style={{ maxWidth: '100%', height: 'auto', border: '1px solid #ccc', cursor: isDragging ? 'grabbing' : 'default' }}
                 />
             </div>
         </div>
