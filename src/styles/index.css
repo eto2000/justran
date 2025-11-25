@@ -30,6 +30,24 @@ h1 {
   color: #2c3e50;
 }
 
+.subtitle {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.subtitle p {
+  font-size: 1.1rem;
+  color: #555;
+  margin: 8px 0;
+}
+
+.subtitle .hint {
+  font-size: 0.95rem;
+  color: #777;
+  opacity: 0.9;
+  font-style: italic;
+}
+
 .upload-section {
   display: flex;
   justify-content: center;
@@ -88,12 +106,40 @@ h1 {
 
 .controls {
   display: flex;
+  flex-direction: column;
   gap: 10px;
-  align-items: center;
   background-color: var(--secondary-color);
   padding: 10px 20px;
   border-radius: var(--border-radius);
+  width: 100%;
+  max-width: 600px;
 }
+
+.control-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+}
+
+.control-row label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+}
+
+.control-row input[type="range"] {
+  flex: 1;
+  min-width: 200px;
+}
+
+.button-group {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
 
 /* Unified button styles */
 .btn-control {

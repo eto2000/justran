@@ -309,30 +309,34 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc }) => {
     return (
         <div className="canvas-editor">
             <div className="controls">
-                <label>
-                    Size:
-                    <input
-                        type="range"
-                        min="0.1"
-                        max="3"
-                        step="0.1"
-                        value={fgScale}
-                        onChange={(e) => setFgScale(parseFloat(e.target.value))}
-                    />
-                </label>
-                <button
-                    onClick={() => setBlendMode(blendMode === 'multiply' ? 'screen' : 'multiply')}
-                    className="btn-control btn-background"
-                >
-                    배경
-                </button>
-                <button
-                    onClick={() => setInvertColors(!invertColors)}
-                    className={`btn-control btn-text-color ${invertColors ? 'active' : ''}`}
-                >
-                    글자색
-                </button>
-                <button onClick={handleDownload} className="btn-control btn-save">저장</button>
+                <div className="control-row">
+                    <label>
+                        Size:
+                        <input
+                            type="range"
+                            min="0.1"
+                            max="3"
+                            step="0.1"
+                            value={fgScale}
+                            onChange={(e) => setFgScale(parseFloat(e.target.value))}
+                        />
+                    </label>
+                </div>
+                <div className="control-row button-group">
+                    <button
+                        onClick={() => setBlendMode(blendMode === 'multiply' ? 'screen' : 'multiply')}
+                        className="btn-control btn-background"
+                    >
+                        배경제거
+                    </button>
+                    <button
+                        onClick={() => setInvertColors(!invertColors)}
+                        className={`btn-control btn-text-color ${invertColors ? 'active' : ''}`}
+                    >
+                        글자색
+                    </button>
+                    <button onClick={handleDownload} className="btn-control btn-save">저장</button>
+                </div>
             </div>
             <div className="canvas-container">
                 <canvas

@@ -10,8 +10,10 @@ function App() {
   return (
     <div className="app-container">
       <header>
-        <h1>Just Ran!</h1>
-        <p>배경이미지와 기록을 올리세요</p>
+        <div className="subtitle">
+          <p>배경이미지와 기록이미지를 올리세요</p>
+          <p className="hint">* 기록이미지는 배경이 검은색이나 흰색 가능</p>
+        </div>
       </header>
 
       <div className="upload-section">
