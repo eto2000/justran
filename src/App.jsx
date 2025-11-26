@@ -49,7 +49,7 @@ function App() {
           />
         ) : (
           <div className="placeholder">
-            <p>다녀왔냐? 기록 남기자</p>
+            <p>달렸으니 기록 남기자</p>
           </div>
         )}
       </main>
