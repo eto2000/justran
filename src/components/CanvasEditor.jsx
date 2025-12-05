@@ -413,17 +413,9 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
         const url = canvas.toDataURL();
 
         // Simple detection for mobile devices to prefer preview over download link
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
-        if (isMobile) {
-            setPreviewUrl(url);
-            setShowPreview(true);
-        } else {
-            const link = document.createElement('a');
-            link.download = 'composed-image.png';
-            link.href = url;
-            link.click();
-        }
+        // Always show preview (popup) instead of direct download
+        setPreviewUrl(url);
+        setShowPreview(true);
     };
 
     return (
