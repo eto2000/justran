@@ -364,21 +364,31 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
                 };
 
                 // Prepare for recording
-                video.pause();
-                video.currentTime = 0;
-                video.loop = false; // Play once for recording
+                const startRecording = () => {
+                    mediaRecorder.start();
+                    console.log("Recording started");
 
-                mediaRecorder.start();
-                console.log("Recording started");
+                    video.onended = () => {
+                        console.log("Video ended, stopping recording");
+                        mediaRecorder.stop();
+                        video.onended = null; // Cleanup
+                    };
 
-                video.onended = () => {
-                    console.log("Video ended, stopping recording");
-                    mediaRecorder.stop();
-                    video.onended = null; // Cleanup
+                    video.play().then(() => console.log("Video playing for recording"))
+                        .catch(e => console.error("Video play failed during recording:", e));
                 };
 
-                video.play().then(() => console.log("Video playing for recording"))
-                    .catch(e => console.error("Video play failed during recording:", e));
+                video.pause();
+                video.loop = false; // Play once for recording
+
+                // Wait for seek to complete before starting
+                const onSeeked = () => {
+                    video.removeEventListener('seeked', onSeeked);
+                    startRecording();
+                };
+
+                video.addEventListener('seeked', onSeeked);
+                video.currentTime = 0;
             } catch (e) {
                 console.error("Error in video download:", e);
                 // Reset downloading state on error
