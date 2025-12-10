@@ -347,13 +347,9 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
                     const blob = new Blob(chunks, { type: mimeType });
                     const url = URL.createObjectURL(blob);
 
-                    // Download logic
-                    const link = document.createElement('a');
-                    link.href = url;
-                    // Extension based on mimeType
-                    const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
-                    link.download = `composed-video.${ext}`;
-                    link.click();
+                    // Show preview popup instead of downloading
+                    setPreviewUrl(url);
+                    setShowPreview(true);
 
                     // Reset video loop
                     video.loop = true;
