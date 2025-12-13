@@ -16,6 +16,12 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
     const [invertColors, setInvertColors] = useState(false); // Toggle to invert text colors
     const [isDownloading, setIsDownloading] = useState(false); // Track download progress
 
+    // Rotation state
+    const [fgRotation, setFgRotation] = useState(0); // in degrees
+    const initialTouchAngle = useRef(0);
+    const initialRotationRef = useRef(0);
+    const [isRotating, setIsRotating] = useState(false);
+
     // Store image objects to avoid reloading them on every render
     const bgImgRef = useRef(null);
     const fgImgRef = useRef(null);
@@ -105,9 +111,22 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
                         }
                     }
                     tempCtx.putImageData(imageData, 0, 0);
-                    ctx.drawImage(tempCanvas, fgPosition.x, fgPosition.y, fgWidth, fgHeight);
+
+                    // Translate to center of image position, rotate, then draw
+                    const centerX = fgPosition.x + fgWidth / 2;
+                    const centerY = fgPosition.y + fgHeight / 2;
+
+                    ctx.translate(centerX, centerY);
+                    ctx.rotate(fgRotation * Math.PI / 180);
+                    ctx.drawImage(tempCanvas, -fgWidth / 2, -fgHeight / 2, fgWidth, fgHeight);
                 } else {
-                    ctx.drawImage(fgImg, fgPosition.x, fgPosition.y, fgWidth, fgHeight);
+                    // Translate to center of image position, rotate, then draw
+                    const centerX = fgPosition.x + fgWidth / 2;
+                    const centerY = fgPosition.y + fgHeight / 2;
+
+                    ctx.translate(centerX, centerY);
+                    ctx.rotate(fgRotation * Math.PI / 180);
+                    ctx.drawImage(fgImg, -fgWidth / 2, -fgHeight / 2, fgWidth, fgHeight);
                 }
                 ctx.restore();
             }
@@ -141,7 +160,7 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
                 cancelAnimationFrame(animationFrameId);
             }
         };
-    }, [imagesLoaded, fgPosition, fgScale, blendMode, invertColors, isVideo]);
+    }, [imagesLoaded, fgPosition, fgScale, fgRotation, blendMode, invertColors, isVideo]);
 
     const handleMouseDown = (e) => {
         if (!imagesLoaded.fg || !fgImgRef.current) return;
@@ -202,6 +221,13 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
         return Math.sqrt(dx * dx + dy * dy);
     };
 
+    // Helper function to calculate angle between two touch points in degrees
+    const getTouchAngle = (touch1, touch2) => {
+        const dx = touch1.clientX - touch2.clientX;
+        const dy = touch1.clientY - touch2.clientY;
+        return Math.atan2(dy, dx) * 180 / Math.PI;
+    };
+
     // Touch event handlers for mobile support
     const handleTouchStart = (e) => {
         if (!imagesLoaded.fg || !fgImgRef.current) return;
@@ -210,11 +236,16 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
         if (e.touches.length === 2) {
             e.preventDefault();
             setIsPinching(true);
+            setIsRotating(true);
             setIsDragging(false); // Stop dragging if pinching starts
 
             const distance = getTouchDistance(e.touches[0], e.touches[1]);
             initialPinchDistance.current = distance;
             initialPinchScale.current = fgScale;
+
+            const angle = getTouchAngle(e.touches[0], e.touches[1]);
+            initialTouchAngle.current = angle;
+            initialRotationRef.current = fgRotation;
             return;
         }
 
@@ -259,6 +290,10 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
             // Limit scale between 0.1 and 3 (same as slider)
             const clampedScale = Math.max(0.1, Math.min(3, scale));
             setFgScale(clampedScale);
+
+            const angle = getTouchAngle(e.touches[0], e.touches[1]);
+            const angleDelta = angle - initialTouchAngle.current;
+            setFgRotation(initialRotationRef.current + angleDelta);
             return;
         }
 
@@ -285,10 +320,12 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
         if (e.touches.length === 0) {
             setIsDragging(false);
             setIsPinching(false);
+            setIsRotating(false);
         }
         // If went from 2 fingers to 1, stop pinching but might start dragging
         else if (e.touches.length === 1 && isPinching) {
             setIsPinching(false);
+            setIsRotating(false);
         }
     };
 
