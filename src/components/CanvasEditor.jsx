@@ -25,6 +25,7 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
     // Store image objects to avoid reloading them on every render
     const bgImgRef = useRef(null);
     const fgImgRef = useRef(null);
+    const invertedFgImgRef = useRef(null);
     const [imagesLoaded, setImagesLoaded] = useState({ bg: false, fg: false });
 
     // Load images when sources change
@@ -57,8 +58,28 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
 
         if (foregroundSrc) {
             const fgImg = new Image();
+            fgImg.crossOrigin = "anonymous";
             fgImg.onload = () => {
                 fgImgRef.current = fgImg;
+
+                // Pre-calculate inverted version
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = fgImg.width;
+                tempCanvas.height = fgImg.height;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.drawImage(fgImg, 0, 0);
+                const imageData = tempCtx.getImageData(0, 0, fgImg.width, fgImg.height);
+                const data = imageData.data;
+                for (let i = 0; i < data.length; i += 4) {
+                    if (data[i + 3] > 0) {
+                        data[i] = 255 - data[i];
+                        data[i + 1] = 255 - data[i + 1];
+                        data[i + 2] = 255 - data[i + 2];
+                    }
+                }
+                tempCtx.putImageData(imageData, 0, 0);
+                invertedFgImgRef.current = tempCanvas;
+
                 setImagesLoaded(prev => ({ ...prev, fg: true }));
             };
             fgImg.src = foregroundSrc;
@@ -93,41 +114,19 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
                 const fgWidth = fgImg.width * fgScale;
                 const fgHeight = fgImg.height * fgScale;
 
-                if (invertColors) {
-                    const tempCanvas = document.createElement('canvas');
-                    tempCanvas.width = fgImg.width;
-                    tempCanvas.height = fgImg.height;
-                    const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true, alpha: true });
-                    tempCtx.clearRect(0, 0, fgImg.width, fgImg.height);
-                    tempCtx.drawImage(fgImg, 0, 0);
-                    const imageData = tempCtx.getImageData(0, 0, fgImg.width, fgImg.height);
-                    const data = imageData.data;
-                    for (let i = 0; i < data.length; i += 4) {
-                        const alpha = data[i + 3];
-                        if (alpha > 0) {
-                            data[i] = 255 - data[i];
-                            data[i + 1] = 255 - data[i + 1];
-                            data[i + 2] = 255 - data[i + 2];
-                        }
-                    }
-                    tempCtx.putImageData(imageData, 0, 0);
+                // Translate to center of image position, rotate, then draw
+                const centerX = fgPosition.x + fgWidth / 2;
+                const centerY = fgPosition.y + fgHeight / 2;
 
-                    // Translate to center of image position, rotate, then draw
-                    const centerX = fgPosition.x + fgWidth / 2;
-                    const centerY = fgPosition.y + fgHeight / 2;
+                ctx.translate(centerX, centerY);
+                ctx.rotate(fgRotation * Math.PI / 180);
 
-                    ctx.translate(centerX, centerY);
-                    ctx.rotate(fgRotation * Math.PI / 180);
-                    ctx.drawImage(tempCanvas, -fgWidth / 2, -fgHeight / 2, fgWidth, fgHeight);
+                if (invertColors && invertedFgImgRef.current) {
+                    ctx.drawImage(invertedFgImgRef.current, -fgWidth / 2, -fgHeight / 2, fgWidth, fgHeight);
                 } else {
-                    // Translate to center of image position, rotate, then draw
-                    const centerX = fgPosition.x + fgWidth / 2;
-                    const centerY = fgPosition.y + fgHeight / 2;
-
-                    ctx.translate(centerX, centerY);
-                    ctx.rotate(fgRotation * Math.PI / 180);
                     ctx.drawImage(fgImg, -fgWidth / 2, -fgHeight / 2, fgWidth, fgHeight);
                 }
+
                 ctx.restore();
             }
         };
