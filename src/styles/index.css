@@ -88,7 +88,7 @@ h1 {
   min-height: 500px;
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start;
 }
 
 .placeholder {
@@ -219,7 +219,6 @@ h1 {
 .canvas-container {
   overflow: auto;
   max-width: 100%;
-  max-height: 80vh;
   border: 1px solid #ddd;
 }
 
@@ -232,6 +231,7 @@ h1 {
 
   .workspace {
     padding: 5px;
+    margin-right: 20px;
   }
 
   header {

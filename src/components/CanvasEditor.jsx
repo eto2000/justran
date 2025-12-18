@@ -541,8 +541,8 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
                         backgroundColor: 'white',
                         padding: '20px',
                         borderRadius: '10px',
-                        maxWidth: '90%',
-                        maxHeight: '90%',
+                        width: '90%',
+                        maxWidth: '800px',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
@@ -554,7 +554,6 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
                             alt="Preview"
                             style={{
                                 maxWidth: '100%',
-                                maxHeight: '60vh',
                                 objectFit: 'contain',
                                 border: '1px solid #eee'
                             }}
