@@ -21,6 +21,9 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
     const initialTouchAngle = useRef(0);
     const initialRotationRef = useRef(0);
     const [isRotating, setIsRotating] = useState(false);
+    const isDraggingRef = useRef(false);
+    const isPinchingRef = useRef(false);
+    const isRotatingRef = useRef(false);
 
     // Store image objects to avoid reloading them on every render
     const bgImgRef = useRef(null);
@@ -227,106 +230,128 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
         return Math.atan2(dy, dx) * 180 / Math.PI;
     };
 
-    // Touch event handlers for mobile support
-    const handleTouchStart = (e) => {
-        if (!imagesLoaded.fg || !fgImgRef.current) return;
+    // Touch event handlers for mobile support via useEffect to handle non-passive events
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
 
-        // Two-finger pinch to zoom
-        if (e.touches.length === 2) {
-            e.preventDefault();
-            setIsPinching(true);
-            setIsRotating(true);
-            setIsDragging(false); // Stop dragging if pinching starts
+        const handleTS = (e) => {
+            if (!imagesLoaded.fg || !fgImgRef.current) return;
 
-            const distance = getTouchDistance(e.touches[0], e.touches[1]);
-            initialPinchDistance.current = distance;
-            initialPinchScale.current = fgScale;
+            // Two-finger pinch to zoom
+            if (e.touches.length === 2) {
+                e.preventDefault();
+                isPinchingRef.current = true;
+                isRotatingRef.current = true;
+                isDraggingRef.current = false;
+                setIsPinching(true);
+                setIsRotating(true);
+                setIsDragging(false);
 
-            const angle = getTouchAngle(e.touches[0], e.touches[1]);
-            initialTouchAngle.current = angle;
-            initialRotationRef.current = fgRotation;
-            return;
-        }
+                const distance = getTouchDistance(e.touches[0], e.touches[1]);
+                initialPinchDistance.current = distance;
+                initialPinchScale.current = fgScale;
 
-        // Single finger drag
-        if (e.touches.length === 1) {
-            const touch = e.touches[0];
-            const canvas = canvasRef.current;
-            const rect = canvas.getBoundingClientRect();
+                const angle = getTouchAngle(e.touches[0], e.touches[1]);
+                initialTouchAngle.current = angle;
+                initialRotationRef.current = fgRotation;
+                return;
+            }
 
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-            const touchX = (touch.clientX - rect.left) * scaleX;
-            const touchY = (touch.clientY - rect.top) * scaleY;
+            // Single finger drag
+            if (e.touches.length === 1) {
+                const touch = e.touches[0];
+                const rect = canvas.getBoundingClientRect();
 
-            const fgImg = fgImgRef.current;
-            const fgWidth = fgImg.width * fgScale;
-            const fgHeight = fgImg.height * fgScale;
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+                const touchX = (touch.clientX - rect.left) * scaleX;
+                const touchY = (touch.clientY - rect.top) * scaleY;
 
-            if (
-                touchX >= fgPosition.x &&
-                touchX <= fgPosition.x + fgWidth &&
-                touchY >= fgPosition.y &&
-                touchY <= fgPosition.y + fgHeight
-            ) {
-                setIsDragging(true);
-                setDragStart({
-                    x: touchX - fgPosition.x,
-                    y: touchY - fgPosition.y
+                const fgImg = fgImgRef.current;
+                const fgWidth = fgImg.width * fgScale;
+                const fgHeight = fgImg.height * fgScale;
+
+                if (
+                    touchX >= fgPosition.x &&
+                    touchX <= fgPosition.x + fgWidth &&
+                    touchY >= fgPosition.y &&
+                    touchY <= fgPosition.y + fgHeight
+                ) {
+                    // Only prevent default (stop scrolling) if touching the foreground object
+                    e.preventDefault();
+                    isDraggingRef.current = true;
+                    setIsDragging(true);
+                    setDragStart({
+                        x: touchX - fgPosition.x,
+                        y: touchY - fgPosition.y
+                    });
+                }
+            }
+        };
+
+        const handleTM = (e) => {
+            // Handle pinch-to-zoom
+            if (isPinchingRef.current && e.touches.length === 2) {
+                e.preventDefault();
+
+                const distance = getTouchDistance(e.touches[0], e.touches[1]);
+                const scale = (distance / initialPinchDistance.current) * initialPinchScale.current;
+
+                // Limit scale between 0.1 and 3 (same as slider)
+                const clampedScale = Math.max(0.1, Math.min(3, scale));
+                setFgScale(clampedScale);
+
+                const angle = getTouchAngle(e.touches[0], e.touches[1]);
+                const angleDelta = angle - initialTouchAngle.current;
+                setFgRotation(initialRotationRef.current + angleDelta);
+                return;
+            }
+
+            // Handle single-finger drag
+            if (isDraggingRef.current && e.touches.length === 1) {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const rect = canvas.getBoundingClientRect();
+
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+                const touchX = (touch.clientX - rect.left) * scaleX;
+                const touchY = (touch.clientY - rect.top) * scaleY;
+
+                setFgPosition({
+                    x: touchX - dragStart.x,
+                    y: touchY - dragStart.y
                 });
             }
-        }
-    };
+        };
 
-    const handleTouchMove = (e) => {
-        // Handle pinch-to-zoom
-        if (isPinching && e.touches.length === 2) {
-            e.preventDefault();
+        const handleTE = (e) => {
+            if (e.touches.length === 0) {
+                isDraggingRef.current = false;
+                isPinchingRef.current = false;
+                isRotatingRef.current = false;
+                setIsDragging(false);
+                setIsPinching(false);
+                setIsRotating(false);
+            } else if (e.touches.length === 1 && isPinchingRef.current) {
+                isPinchingRef.current = false;
+                isRotatingRef.current = false;
+                setIsPinching(false);
+                setIsRotating(false);
+            }
+        };
 
-            const distance = getTouchDistance(e.touches[0], e.touches[1]);
-            const scale = (distance / initialPinchDistance.current) * initialPinchScale.current;
+        canvas.addEventListener('touchstart', handleTS, { passive: false });
+        canvas.addEventListener('touchmove', handleTM, { passive: false });
+        canvas.addEventListener('touchend', handleTE, { passive: false });
 
-            // Limit scale between 0.1 and 3 (same as slider)
-            const clampedScale = Math.max(0.1, Math.min(3, scale));
-            setFgScale(clampedScale);
-
-            const angle = getTouchAngle(e.touches[0], e.touches[1]);
-            const angleDelta = angle - initialTouchAngle.current;
-            setFgRotation(initialRotationRef.current + angleDelta);
-            return;
-        }
-
-        // Handle single-finger drag
-        if (isDragging && e.touches.length === 1) {
-            const touch = e.touches[0];
-            const canvas = canvasRef.current;
-            const rect = canvas.getBoundingClientRect();
-
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-            const touchX = (touch.clientX - rect.left) * scaleX;
-            const touchY = (touch.clientY - rect.top) * scaleY;
-
-            setFgPosition({
-                x: touchX - dragStart.x,
-                y: touchY - dragStart.y
-            });
-        }
-    };
-
-    const handleTouchEnd = (e) => {
-        // If no more touches, reset both states
-        if (e.touches.length === 0) {
-            setIsDragging(false);
-            setIsPinching(false);
-            setIsRotating(false);
-        }
-        // If went from 2 fingers to 1, stop pinching but might start dragging
-        else if (e.touches.length === 1 && isPinching) {
-            setIsPinching(false);
-            setIsRotating(false);
-        }
-    };
+        return () => {
+            canvas.removeEventListener('touchstart', handleTS);
+            canvas.removeEventListener('touchmove', handleTM);
+            canvas.removeEventListener('touchend', handleTE);
+        };
+    }, [imagesLoaded, fgPosition, fgScale, fgRotation, dragStart]);
 
     const handleDownload = async () => {
         console.log("handleDownload called");
@@ -509,15 +534,12 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
                     onMouseMove={handleMouseMove}
                     onMouseUp={handleMouseUp}
                     onMouseLeave={handleMouseUp}
-                    onTouchStart={handleTouchStart}
-                    onTouchMove={handleTouchMove}
-                    onTouchEnd={handleTouchEnd}
                     style={{
                         maxWidth: '100%',
                         height: 'auto',
                         border: '1px solid #ccc',
                         cursor: isDragging ? 'grabbing' : 'default',
-                        touchAction: 'none' // Prevent scrolling on mobile while dragging
+                        touchAction: 'manipulation' // Allow basic gestures like scroll
                     }}
                 />
             </div>
