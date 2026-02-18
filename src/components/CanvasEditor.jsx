@@ -52,6 +52,7 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
             };
         } else if (backgroundSrc) {
             const bgImg = new Image();
+            bgImg.crossOrigin = "anonymous";
             bgImg.onload = () => {
                 bgImgRef.current = bgImg;
                 setImagesLoaded(prev => ({ ...prev, bg: true }));
@@ -355,138 +356,122 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
 
     const handleDownload = async () => {
         console.log("handleDownload called");
-
-        // Prevent multiple simultaneous downloads
-        if (isDownloading) {
-            console.log("Download already in progress, ignoring...");
-            return;
-        }
+        if (isDownloading) return;
 
         const canvas = canvasRef.current;
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
         if (isVideo && videoRef.current) {
+            // Video download logic (maintained but optimized)
             console.log("Downloading video...");
             const video = videoRef.current;
-
-            // Set downloading state
             setIsDownloading(true);
 
-            // Start recording process
             try {
-                const stream = canvas.captureStream(30); // 30 FPS
-                console.log("Stream captured:", stream);
-
-                let mimeType = 'video/webm'; // Default fallback
-                if (MediaRecorder.isTypeSupported('video/mp4')) {
-                    mimeType = 'video/mp4';
-                } else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) {
-                    mimeType = 'video/webm;codecs=vp9';
-                } else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8')) {
-                    mimeType = 'video/webm;codecs=vp8';
-                }
-
-                console.log("Using MIME type:", mimeType);
-
-                if (!MediaRecorder.isTypeSupported(mimeType)) {
-                    alert("이 브라우저에서는 비디오 저장을 지원하지 않습니다.");
-                    return;
+                const stream = canvas.captureStream(30);
+                let mimeType = 'video/webm';
+                const preferredTypes = ['video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8'];
+                for (const type of preferredTypes) {
+                    if (MediaRecorder.isTypeSupported(type)) {
+                        mimeType = type;
+                        break;
+                    }
                 }
 
                 const mediaRecorder = new MediaRecorder(stream, { mimeType });
-                console.log("MediaRecorder created:", mediaRecorder);
-
                 const chunks = [];
-
                 mediaRecorder.ondataavailable = (e) => {
-                    if (e.data.size > 0) {
-                        chunks.push(e.data);
-                    }
+                    if (e.data.size > 0) chunks.push(e.data);
                 };
 
-                mediaRecorder.onstop = () => {
-                    console.log("Recording stopped, creating blob...");
+                mediaRecorder.onstop = async () => {
                     const blob = new Blob(chunks, { type: mimeType });
-                    const url = URL.createObjectURL(blob);
+                    const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+                    const fileName = `justran-video.${ext}`;
 
-                    // Download logic
+                    if (navigator.share) {
+                        try {
+                            const file = new File([blob], fileName, { type: mimeType });
+                            await navigator.share({
+                                files: [file],
+                                title: '저장하기',
+                            });
+                            setIsDownloading(false);
+                            video.loop = true;
+                            video.play();
+                            return;
+                        } catch (err) {
+                            console.log('Video share failed:', err);
+                        }
+                    }
+
+                    const url = URL.createObjectURL(blob);
                     const link = document.createElement('a');
                     link.href = url;
-                    // Extension based on mimeType
-                    const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
-                    link.download = `composed-video.${ext}`;
+                    link.download = fileName;
                     link.click();
-
-                    // Reset video loop
+                    setIsDownloading(false);
                     video.loop = true;
                     video.play();
-
-                    // Reset downloading state
-                    setIsDownloading(false);
-                };
-
-                // Prepare for recording
-                const startRecording = () => {
-                    mediaRecorder.start();
-                    console.log("Recording started");
-
-                    video.onended = () => {
-                        console.log("Video ended, stopping recording");
-                        mediaRecorder.stop();
-                        video.onended = null; // Cleanup
-                    };
-
-                    video.play().then(() => console.log("Video playing for recording"))
-                        .catch(e => console.error("Video play failed during recording:", e));
                 };
 
                 video.pause();
-                video.loop = false; // Play once for recording
-
-                // Wait for seek to complete before starting
+                video.loop = false;
                 const onSeeked = () => {
                     video.removeEventListener('seeked', onSeeked);
-                    startRecording();
+                    mediaRecorder.start();
+                    video.play();
+                    video.onended = () => {
+                        mediaRecorder.stop();
+                        video.onended = null;
+                    };
                 };
-
                 video.addEventListener('seeked', onSeeked);
                 video.currentTime = 0;
             } catch (e) {
-                console.error("Error in video download:", e);
-                // Reset downloading state on error
+                console.error("Video record failed:", e);
                 setIsDownloading(false);
             }
             return;
         }
 
-        console.log("Downloading image...");
-        // Image download logic
-        // Check if Web Share API is supported and we can share files
-        if (navigator.share && navigator.canShare) {
-            try {
-                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-                const file = new File([blob], 'composed-image.png', { type: 'image/png' });
+        // Image saving logic
+        setIsDownloading(true);
 
-                if (navigator.canShare({ files: [file] })) {
+        // Use toBlob directly which is more compatible with gesture tracking than multiple awaits
+        canvas.toBlob(async (blob) => {
+            if (!blob) {
+                setIsDownloading(false);
+                return;
+            }
+
+            // Try Web Share API - This is the ONLY way to "Save to Photos" on iOS from a button
+            if (navigator.share) {
+                try {
+                    const file = new File([blob], 'justran-result.png', { type: 'image/png' });
+                    // On Safari, we MUST trigger this as soon as possible after the click
                     await navigator.share({
                         files: [file],
-                        title: 'Composed Image',
-                        text: 'Check out my composed image!'
+                        title: 'Justran 결과'
                     });
+                    setIsDownloading(false);
                     return;
+                } catch (error) {
+                    console.log('Share failed:', error);
+                    // If user cancelled, don't show the modal
+                    if (error.name === 'AbortError') {
+                        setIsDownloading(false);
+                        return;
+                    }
                 }
-            } catch (error) {
-                console.log('Sharing failed or was cancelled:', error);
-                // Fallback to preview if sharing fails
             }
-        }
 
-        // Fallback: Show preview for long-press save on mobile, or download link on desktop
-        const url = canvas.toDataURL();
-
-        // Simple detection for mobile devices to prefer preview over download link
-        // Always show preview (popup) instead of direct download
-        setPreviewUrl(url);
-        setShowPreview(true);
+            // Fallback for non-sharing browsers or failed sharing: Show the preview modal
+            const url = canvas.toDataURL('image/png');
+            setPreviewUrl(url);
+            setShowPreview(true);
+            setIsDownloading(false);
+        }, 'image/png');
     };
 
     return (
@@ -494,7 +479,7 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
             <div className="controls">
                 <div className="control-row">
                     <label>
-                        Size:
+                        Scale:
                         <input
                             type="range"
                             min="0.1"
@@ -508,13 +493,13 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
                 <div className="control-row button-group">
                     <button
                         onClick={() => setBlendMode(blendMode === 'multiply' ? 'screen' : 'multiply')}
-                        className="btn-control btn-background"
+                        className={`btn-control ${blendMode === 'screen' ? 'active' : ''}`}
                     >
                         기록배경
                     </button>
                     <button
                         onClick={() => setInvertColors(!invertColors)}
-                        className={`btn-control btn-text-color ${invertColors ? 'active' : ''}`}
+                        className={`btn-control ${invertColors ? 'active' : ''}`}
                     >
                         기록글자
                     </button>
@@ -535,63 +520,28 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
                     onMouseUp={handleMouseUp}
                     onMouseLeave={handleMouseUp}
                     style={{
-                        maxWidth: '100%',
-                        height: 'auto',
-                        border: '1px solid #ccc',
                         cursor: isDragging ? 'grabbing' : 'default',
-                        touchAction: 'manipulation' // Allow basic gestures like scroll
+                        touchAction: 'manipulation'
                     }}
                 />
             </div>
 
             {showPreview && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    backgroundColor: 'rgba(0,0,0,0.8)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 1000,
-                    padding: '20px'
-                }}>
-                    <div style={{
-                        backgroundColor: 'white',
-                        padding: '20px',
-                        borderRadius: '10px',
-                        width: '90%',
-                        maxWidth: '800px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '15px'
-                    }}>
-                        <p style={{ margin: 0, fontWeight: 'bold' }}>저장하려면 이미지를 오래 눌러요</p>
+                <div className="modal-overlay" onClick={() => setShowPreview(false)}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h3>이미지 저장</h3>
+                            <p>이미지를 길게 누르면 '사진 앱에 저장'할 수 있어요.</p>
+                        </div>
                         <img
                             src={previewUrl}
                             alt="Preview"
-                            style={{
-                                maxWidth: '100%',
-                                objectFit: 'contain',
-                                border: '1px solid #eee'
-                            }}
                         />
                         <button
+                            className="modal-close"
                             onClick={() => setShowPreview(false)}
-                            style={{
-                                padding: '10px 20px',
-                                backgroundColor: '#333',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '5px',
-                                cursor: 'pointer'
-                            }}
                         >
-                            Close
+                            닫기
                         </button>
                     </div>
                 </div>

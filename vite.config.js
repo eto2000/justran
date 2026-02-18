@@ -13,7 +13,7 @@ export default defineConfig({
         name: 'Justran PWA',
         short_name: 'Justran',
         description: 'Justran Progressive Web App',
-        theme_color: '#ffffff',
+        theme_color: '#1a1a1e',
         icons: [
           {
             src: 'pwa-192x192.png',
