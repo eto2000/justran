@@ -320,7 +320,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
 
 @media (max-width: 768px) {
   .app-container {
-    padding: 20px 16px;
+    padding: 24px 16px;
   }
 
   h1 {
@@ -328,13 +328,44 @@ input[type="range"]::-webkit-slider-thumb:hover {
   }
 
   .upload-section {
-    flex-direction: column;
-    align-items: stretch;
+    flex-direction: row;
+    /* Keep them in a row */
+    justify-content: center;
     gap: 12px;
+    margin-bottom: 32px;
+  }
+
+  .upload-label {
+    padding: 12px 24px;
+    flex: 1;
+    min-width: 100px;
+  }
+
+  .controls {
+    padding: 16px;
+  }
+
+  .button-group {
+    flex-wrap: wrap;
+    /* Allow wrapping for the 3-button group */
+    gap: 8px;
+  }
+
+  .btn-control {
+    font-size: 0.9rem;
+    padding: 10px 8px;
+    min-width: 80px;
   }
 
   .workspace {
-    padding: 12px;
-    min-height: 300px;
+    padding: 8px;
+    min-height: 250px;
+  }
+
+  .btn-save {
+    flex: 1 1 100%;
+    /* Take full width if they wrap to a new line */
+    order: 3;
+    /* Always keep at the bottom if wrapped */
   }
 }
