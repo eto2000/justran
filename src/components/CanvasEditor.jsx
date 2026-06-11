@@ -297,8 +297,8 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
                 const distance = getTouchDistance(e.touches[0], e.touches[1]);
                 const scale = (distance / initialPinchDistance.current) * initialPinchScale.current;
 
-                // Limit scale between 0.1 and 3 (same as slider)
-                const clampedScale = Math.max(0.1, Math.min(3, scale));
+                // Limit scale between 0.1 and 6 (same as slider)
+                const clampedScale = Math.max(0.1, Math.min(5, scale));
                 setFgScale(clampedScale);
 
                 const angle = getTouchAngle(e.touches[0], e.touches[1]);
@@ -478,7 +478,7 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
                         <input
                             type="range"
                             min="0.1"
-                            max="3"
+                            max="5"
                             step="0.1"
                             value={fgScale}
                             onChange={(e) => setFgScale(parseFloat(e.target.value))}
