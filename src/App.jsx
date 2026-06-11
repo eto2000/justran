@@ -28,13 +28,13 @@ function App() {
 
       <div className="upload-section">
         <ImageUploader
-          label="배경"
+          label="배경이미지"
           id="bg-upload"
           accept="image/*,video/*"
           onUpload={handleBackgroundUpload}
         />
         <ImageUploader
-          label="기록"
+          label="기록이미지"
           id="fg-upload"
           onUpload={setForegroundSrc}
         />

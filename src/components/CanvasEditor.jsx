@@ -504,13 +504,13 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
                         onClick={() => setBlendMode(blendMode === 'multiply' ? 'screen' : 'multiply')}
                         className={`btn-control ${blendMode === 'screen' ? 'active' : ''}`}
                     >
-                        기록배경
+                        배경제거하기
                     </button>
                     <button
                         onClick={() => setInvertColors(!invertColors)}
                         className={`btn-control ${invertColors ? 'active' : ''}`}
                     >
-                        기록글자
+                        글자색상
                     </button>
                     <button
                         onClick={handleDownload}
