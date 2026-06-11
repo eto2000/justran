@@ -7,7 +7,6 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
     const [fgScale, setFgScale] = useState(1);
     const [isDragging, setIsDragging] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-    const [isPinching, setIsPinching] = useState(false);
     const initialPinchDistance = useRef(0);
     const initialPinchScale = useRef(1);
     const [showPreview, setShowPreview] = useState(false);
@@ -15,12 +14,12 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
     const [blendMode, setBlendMode] = useState('multiply'); // 'multiply' for white bg, 'screen' for black bg
     const [invertColors, setInvertColors] = useState(false); // Toggle to invert text colors
     const [isDownloading, setIsDownloading] = useState(false); // Track download progress
+    const [jpgQuality, setJpgQuality] = useState(80); // JPEG save quality (10-100, default 80)
 
     // Rotation state
     const [fgRotation, setFgRotation] = useState(0); // in degrees
     const initialTouchAngle = useRef(0);
     const initialRotationRef = useRef(0);
-    const [isRotating, setIsRotating] = useState(false);
     const isDraggingRef = useRef(false);
     const isPinchingRef = useRef(false);
     const isRotatingRef = useRef(false);
@@ -35,6 +34,7 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
     // Load images or video when sources change
     useEffect(() => {
         // Reset loaded state when sources change
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setImagesLoaded({ bg: false, fg: false });
 
         if (isVideo && backgroundSrc) {
@@ -245,8 +245,6 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
                 isPinchingRef.current = true;
                 isRotatingRef.current = true;
                 isDraggingRef.current = false;
-                setIsPinching(true);
-                setIsRotating(true);
                 setIsDragging(false);
 
                 const distance = getTouchDistance(e.touches[0], e.touches[1]);
@@ -333,13 +331,9 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
                 isPinchingRef.current = false;
                 isRotatingRef.current = false;
                 setIsDragging(false);
-                setIsPinching(false);
-                setIsRotating(false);
             } else if (e.touches.length === 1 && isPinchingRef.current) {
                 isPinchingRef.current = false;
                 isRotatingRef.current = false;
-                setIsPinching(false);
-                setIsRotating(false);
             }
         };
 
@@ -359,7 +353,6 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
         if (isDownloading) return;
 
         const canvas = canvasRef.current;
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
         if (isVideo && videoRef.current) {
             // Video download logic (maintained but optimized)
@@ -438,6 +431,8 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
         // Image saving logic
         setIsDownloading(true);
 
+        const qualityVal = jpgQuality / 100;
+
         // Use toBlob directly which is more compatible with gesture tracking than multiple awaits
         canvas.toBlob(async (blob) => {
             if (!blob) {
@@ -448,7 +443,7 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
             // Try Web Share API - This is the ONLY way to "Save to Photos" on iOS from a button
             if (navigator.share) {
                 try {
-                    const file = new File([blob], 'justran-result.png', { type: 'image/png' });
+                    const file = new File([blob], 'justran-result.jpg', { type: 'image/jpeg' });
                     // On Safari, we MUST trigger this as soon as possible after the click
                     await navigator.share({
                         files: [file],
@@ -467,11 +462,11 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
             }
 
             // Fallback for non-sharing browsers or failed sharing: Show the preview modal
-            const url = canvas.toDataURL('image/png');
+            const url = canvas.toDataURL('image/jpeg', qualityVal);
             setPreviewUrl(url);
             setShowPreview(true);
             setIsDownloading(false);
-        }, 'image/png');
+        }, 'image/jpeg', qualityVal);
     };
 
     return (
@@ -488,6 +483,20 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
                             value={fgScale}
                             onChange={(e) => setFgScale(parseFloat(e.target.value))}
                         />
+                    </label>
+                </div>
+                <div className="control-row">
+                    <label>
+                        Quality:
+                        <input
+                            type="range"
+                            min="10"
+                            max="100"
+                            step="5"
+                            value={jpgQuality}
+                            onChange={(e) => setJpgQuality(parseInt(e.target.value))}
+                        />
+                        <span style={{ minWidth: '45px', textAlign: 'right' }}>{jpgQuality}%</span>
                     </label>
                 </div>
                 <div className="control-row button-group">
