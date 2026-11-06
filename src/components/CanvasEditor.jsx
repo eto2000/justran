@@ -14,7 +14,7 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
     const [blendMode, setBlendMode] = useState('multiply'); // 'multiply' for white bg, 'screen' for black bg
     const [invertColors, setInvertColors] = useState(false); // Toggle to invert text colors
     const [isDownloading, setIsDownloading] = useState(false); // Track download progress
-    const [jpgQuality, setJpgQuality] = useState(80); // JPEG save quality (10-100, default 80)
+    const jpgQuality = 80; // JPEG save quality fixed at 80%
 
     // Color tint state: null = 원본 색상 사용, string = hex 색상으로 색조화
     const [tintColor, setTintColor] = useState(null);
@@ -612,20 +612,7 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
                         />
                     </label>
                 </div>
-                <div className="control-row">
-                    <label>
-                        Quality:
-                        <input
-                            type="range"
-                            min="10"
-                            max="100"
-                            step="5"
-                            value={jpgQuality}
-                            onChange={(e) => setJpgQuality(parseInt(e.target.value))}
-                        />
-                        <span style={{ minWidth: '45px', textAlign: 'right' }}>{jpgQuality}%</span>
-                    </label>
-                </div>
+
                 <div className="control-row button-group">
                     <button
                         onClick={() => setBlendMode(blendMode === 'multiply' ? 'screen' : 'multiply')}
