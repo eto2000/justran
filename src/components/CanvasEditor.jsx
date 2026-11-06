@@ -16,6 +16,12 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
     const [isDownloading, setIsDownloading] = useState(false); // Track download progress
     const [jpgQuality, setJpgQuality] = useState(80); // JPEG save quality (10-100, default 80)
 
+    // Color tint state: null = 원본 색상 사용, string = hex 색상으로 색조화
+    const [tintColor, setTintColor] = useState(null);
+    const [showColorPicker, setShowColorPicker] = useState(false);
+    const tintedFgImgRef = useRef(null); // 색조화된 기록이미지 캐시
+    const colorPickerRef = useRef(null);
+
     // Rotation state
     const [fgRotation, setFgRotation] = useState(0); // in degrees
     const initialTouchAngle = useRef(0);
@@ -84,12 +90,113 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
                 tempCtx.putImageData(imageData, 0, 0);
                 invertedFgImgRef.current = tempCanvas;
 
+                // 색조화 이미지도 새 소스에 맞게 재계산
+                if (tintColor) {
+                    tintedFgImgRef.current = buildTintedImage(fgImg, tintColor, blendMode, invertColors);
+                }
+
                 setImagesLoaded(prev => ({ ...prev, fg: true }));
             };
             fgImg.src = foregroundSrc;
         }
 
     }, [backgroundSrc, foregroundSrc, isVideo]);
+
+    // hex 색상 문자열을 {r, g, b}로 파싱
+    const hexToRgb = (hex) => {
+        const clean = hex.replace('#', '');
+        return {
+            r: parseInt(clean.substring(0, 2), 16),
+            g: parseInt(clean.substring(2, 4), 16),
+            b: parseInt(clean.substring(4, 6), 16),
+        };
+    };
+
+    /**
+     * 배경 제거 후 남은 픽셀에만 색상을 적용한 오프스크린 캔버스를 반환.
+     *
+     * 기록이미지는 흰 배경(multiply) 또는 검은 배경(screen) 위에 그려진 상태.
+     * - 흰 배경 모드: 픽셀이 밝을수록 배경 → 밝기를 알파 반전으로 마스크 계산
+     *   alpha = 1 - brightness  (흰=0, 검정 텍스트=1)
+     * - 검은 배경 모드: 픽셀이 어두울수록 배경 → 밝기 자체가 알파
+     *   alpha = brightness      (검정=0, 흰 텍스트=1)
+     *
+     * invertColors가 true이면 배경 판정 기준도 반전.
+     */
+    const buildTintedImage = (sourceImg, hexColor, currentBlendMode, isInverted) => {
+        const w = sourceImg.width;
+        const h = sourceImg.height;
+
+        // 원본 픽셀 데이터 추출
+        const srcCanvas = document.createElement('canvas');
+        srcCanvas.width = w;
+        srcCanvas.height = h;
+        const srcCtx = srcCanvas.getContext('2d');
+        srcCtx.drawImage(sourceImg, 0, 0);
+        const srcData = srcCtx.getImageData(0, 0, w, h).data;
+
+        // 결과 캔버스
+        const outCanvas = document.createElement('canvas');
+        outCanvas.width = w;
+        outCanvas.height = h;
+        const outCtx = outCanvas.getContext('2d');
+        const outImageData = outCtx.createImageData(w, h);
+        const out = outImageData.data;
+
+        const { r: tr, g: tg, b: tb } = hexToRgb(hexColor);
+
+        // 실효 블렌드 모드: invertColors가 켜지면 multiply↔screen 반전
+        let effectiveMode = currentBlendMode;
+        if (isInverted) {
+            effectiveMode = currentBlendMode === 'multiply' ? 'screen' : 'multiply';
+        }
+
+        for (let i = 0; i < srcData.length; i += 4) {
+            const pr = srcData[i];
+            const pg = srcData[i + 1];
+            const pb = srcData[i + 2];
+            const pa = srcData[i + 3];
+
+            if (pa === 0) {
+                // 완전 투명 픽셀 → 그대로 투명
+                out[i] = 0; out[i + 1] = 0; out[i + 2] = 0; out[i + 3] = 0;
+                continue;
+            }
+
+            // 밝기 (0~1)
+            const brightness = (pr + pg + pb) / (3 * 255);
+
+            // 배경 기준에 따라 마스크 알파 계산
+            // multiply(흰배경): 어두울수록 전경 → alpha = 1 - brightness
+            // screen(검은배경): 밝을수록 전경  → alpha = brightness
+            let alpha;
+            if (effectiveMode === 'multiply') {
+                alpha = 1 - brightness;
+            } else {
+                alpha = brightness;
+            }
+
+            // 원본 픽셀 알파도 반영
+            alpha = alpha * (pa / 255);
+
+            out[i]     = tr;
+            out[i + 1] = tg;
+            out[i + 2] = tb;
+            out[i + 3] = Math.round(alpha * 255);
+        }
+
+        outCtx.putImageData(outImageData, 0, 0);
+        return outCanvas;
+    };
+
+    // tintColor / blendMode / invertColors 가 바뀌면 색조화 이미지를 재계산
+    useEffect(() => {
+        if (!fgImgRef.current || !tintColor) {
+            tintedFgImgRef.current = null;
+            return;
+        }
+        tintedFgImgRef.current = buildTintedImage(fgImgRef.current, tintColor, blendMode, invertColors);
+    }, [tintColor, blendMode, invertColors]);
 
     // Draw canvas whenever images are loaded or position/scale changes
     // Draw canvas whenever images are loaded or position/scale changes
@@ -105,30 +212,34 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
             if (imagesLoaded.fg && fgImgRef.current) {
                 const fgImg = fgImgRef.current;
 
-                // Save context for composite operation
                 ctx.save();
-
-                // Apply blend mode for transparency
-                let effectiveBlendMode = blendMode;
-                if (invertColors) {
-                    effectiveBlendMode = blendMode === 'multiply' ? 'screen' : 'multiply';
-                }
-                ctx.globalCompositeOperation = effectiveBlendMode;
 
                 const fgWidth = fgImg.width * fgScale;
                 const fgHeight = fgImg.height * fgScale;
 
-                // Translate to center of image position, rotate, then draw
                 const centerX = fgPosition.x + fgWidth / 2;
                 const centerY = fgPosition.y + fgHeight / 2;
 
                 ctx.translate(centerX, centerY);
                 ctx.rotate(fgRotation * Math.PI / 180);
 
-                if (invertColors && invertedFgImgRef.current) {
-                    ctx.drawImage(invertedFgImgRef.current, -fgWidth / 2, -fgHeight / 2, fgWidth, fgHeight);
+                if (tintColor && tintedFgImgRef.current) {
+                    // tint 이미지는 이미 배경 제거 + 색상 적용이 완료된 상태
+                    // source-over로 그냥 얹으면 됨
+                    ctx.globalCompositeOperation = 'source-over';
+                    ctx.drawImage(tintedFgImgRef.current, -fgWidth / 2, -fgHeight / 2, fgWidth, fgHeight);
                 } else {
-                    ctx.drawImage(fgImg, -fgWidth / 2, -fgHeight / 2, fgWidth, fgHeight);
+                    // 기존 방식: multiply/screen 블렌드로 배경 제거
+                    let effectiveBlendMode = blendMode;
+                    if (invertColors) {
+                        effectiveBlendMode = blendMode === 'multiply' ? 'screen' : 'multiply';
+                    }
+                    ctx.globalCompositeOperation = effectiveBlendMode;
+
+                    const drawSource = (invertColors && invertedFgImgRef.current)
+                        ? invertedFgImgRef.current
+                        : fgImg;
+                    ctx.drawImage(drawSource, -fgWidth / 2, -fgHeight / 2, fgWidth, fgHeight);
                 }
 
                 ctx.restore();
@@ -163,7 +274,7 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
                 cancelAnimationFrame(animationFrameId);
             }
         };
-    }, [imagesLoaded, fgPosition, fgScale, fgRotation, blendMode, invertColors, isVideo]);
+    }, [imagesLoaded, fgPosition, fgScale, fgRotation, blendMode, invertColors, tintColor, isVideo]);
 
     const handleMouseDown = (e) => {
         if (!imagesLoaded.fg || !fgImgRef.current) return;
@@ -348,6 +459,22 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
         };
     }, [imagesLoaded, fgPosition, fgScale, fgRotation, dragStart]);
 
+    // 컬러피커 외부 클릭 시 닫기
+    useEffect(() => {
+        if (!showColorPicker) return;
+        const handleOutsideClick = (e) => {
+            if (colorPickerRef.current && !colorPickerRef.current.contains(e.target)) {
+                setShowColorPicker(false);
+            }
+        };
+        document.addEventListener('mousedown', handleOutsideClick);
+        document.addEventListener('touchstart', handleOutsideClick);
+        return () => {
+            document.removeEventListener('mousedown', handleOutsideClick);
+            document.removeEventListener('touchstart', handleOutsideClick);
+        };
+    }, [showColorPicker]);
+
     const handleDownload = async () => {
         console.log("handleDownload called");
         if (isDownloading) return;
@@ -510,8 +637,65 @@ const CanvasEditor = ({ backgroundSrc, foregroundSrc, isVideo }) => {
                         onClick={() => setInvertColors(!invertColors)}
                         className={`btn-control ${invertColors ? 'active' : ''}`}
                     >
-                        글자색상
+                        글자반전
                     </button>
+                    {/* 색상 선택 버튼 */}
+                    <div className="color-picker-wrapper" ref={colorPickerRef}>
+                        <button
+                            className={`btn-control btn-color-pick ${tintColor ? 'active' : ''}`}
+                            onClick={() => setShowColorPicker(v => !v)}
+                            title="기록이미지 색상 선택"
+                        >
+                            {/* 현재 선택된 색상을 작은 원으로 표시 */}
+                            <span
+                                className="color-dot"
+                                style={{ background: tintColor || 'transparent' }}
+                            />
+                            색상선택
+                        </button>
+                        {showColorPicker && (
+                            <div className="color-popover">
+                                <div className="color-popover-header">
+                                    <span>기록이미지 색상</span>
+                                    {tintColor && (
+                                        <button
+                                            className="color-reset-btn"
+                                            onClick={() => { setTintColor(null); setShowColorPicker(false); }}
+                                        >
+                                            원본으로
+                                        </button>
+                                    )}
+                                </div>
+                                {/* 프리셋 색상 팔레트 */}
+                                <div className="color-swatches">
+                                    {[
+                                        '#ffffff', '#000000', '#e8e8e8',
+                                        '#ff3b30', '#ff9500', '#ffcc00',
+                                        '#34c759', '#30d5c8', '#007aff',
+                                        '#5856d6', '#af52de', '#ff2d55',
+                                    ].map(color => (
+                                        <button
+                                            key={color}
+                                            className={`color-swatch ${tintColor === color ? 'selected' : ''}`}
+                                            style={{ background: color }}
+                                            onClick={() => { setTintColor(color); setShowColorPicker(false); }}
+                                            title={color}
+                                        />
+                                    ))}
+                                </div>
+                                {/* 직접 색상 입력 */}
+                                <div className="color-custom-row">
+                                    <span>직접 선택</span>
+                                    <input
+                                        type="color"
+                                        className="color-input-native"
+                                        value={tintColor || '#ffffff'}
+                                        onChange={(e) => setTintColor(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </div>
                     <button
                         onClick={handleDownload}
                         className="btn-control btn-save"
